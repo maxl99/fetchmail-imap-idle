@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# fetchmail This shell script takes care of starting and stopping
+# the fetchmail DAEMON.
+#
+#
+# chkconfig: 2345 95 5
+# description: fetchmail fetchs mail from pop3/imap mail servers
+
+fetchmailuser=mail
+fetchmailgroup=mail
+fetchmailddir=/var/lib/fetchmail
+
+# Fetchmail installed?
+[ -f /usr/bin/fetchmail ] || exit 0
+
+# Config
+INTERVAL=10
+[ -f /etc/sysconfig/fetchmail ] && . /etc/sysconfig/fetchmail
+
+# See how we were called.
+case "$1" in
+    start)
+        # Start daemons.
+        for conffile in /etc/fetchmail.conf.d/*.conf;  do
+                bname=$(basename "$conffile")
+                fetchmailddirsub=$fetchmailddir/$bname
+                if [ ! -d "$fetchmailddirsub" ];  then
+                        echo "bin drin"
+                        mkdir "$fetchmailddirsub"
+                        chown "$fetchmailuser:$fetchmailgroup" "$fetchmailddirsub"
+                        chmod 700 "$fetchmailddirsub"
+                fi
+                FETCHMAILHOME=$fetchmailddirsub
+                [ -f "$conffile" ]  &&  runuser -s /bin/bash "$fetchmailuser" -c "echo '$FETCHMAILHOME' && /usr/bin/fetchmail --daemon '$INTERVAL' -v --syslog --pidfile '$fetchmailddirsub/.fetch.pid' --fetchmailrc '$conffile'" #> /dev/null 2>&1
+       done
+        touch /var/lock/subsys/fetchmail
+        ;;
+
+    stop)
+        # Stop daemons.
+        echo -n "Shutting down fetchmail: "
+        for instance in $fetchmailddir/*/*.pid;  do
+                fetchmailddirsub=$(dirname $instance)
+                if [ -f "$instance" ];  then
+                        pid=$(head -1 "$instance")
+                        FETCHMAILHOME="$fetchmailddirsub" runuser -s /bin/bash "$fetchmailuser" -c "/usr/bin/fetchmail --pidfile '$instance' --quit" > /dev/null 2>&1
+                fi
+                rmdir "$fetchmailddirsub"
+        done
+        for instance in $fetchmailddir/*.pid;  do
+                if [ -f "$instance" ];  then
+                        runuser -s /bin/bash "$fetchmailuser" -c "/usr/bin/fetchmail --pidfile '$instance' --quit" > /dev/null 2>&1
+                fi
+        done
+        rm -f /var/lock/subsys/fetchmail
+        ;;
+
+    restart)
+        $0 stop
+        $0 start
+        ;;
+
+    *)
+        echo "Usage: fetchmail {start|stop|restart}"
+        exit 1
+esac
+exit 0

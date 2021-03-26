@@ -1,0 +1,13 @@
+[Unit]
+Description=A remote mail retrieval and forwarding utility
+After=network-online.target sendmail.service
+
+[Service]
+ExecStart=/usr/local/bin/fetchmail-imap-idle  start
+ExecReload=/usr/local/bin/fetchmail-imap-idle restart
+ExecStop=/usr/local/bin/fetchmail-imap-idle stop
+Type=forking
+GuessMainPID=no
+
+[Install]
+WantedBy=multi-user.target
